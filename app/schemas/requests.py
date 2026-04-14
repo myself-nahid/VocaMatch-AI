@@ -1,11 +1,15 @@
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 class UserProfile(BaseModel):
     user_id: str
-    preferences: str
-    answers: List[Dict[str, str]] # e.g., [{"question": "...", "answer": "..."}]
+    name: str
+    age: int
+    location: str
+    interests: List[str]
+    voice_intro_text: str
+    answers: Optional[List[Dict[str, str]]] =[]
 
-class MatchRequest(BaseModel):
-    user_a: UserProfile
-    user_b: UserProfile
+class BulkMatchRequest(BaseModel):
+    main_user: UserProfile
+    potential_matches: List[UserProfile] # A batch of candidates
