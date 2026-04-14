@@ -48,7 +48,8 @@ async def calculate_compatibility(user_a: UserProfile, user_b: UserProfile) -> M
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
-            temperature=0.7
+            temperature=0.0,
+            top_p=1.0
         )
         
         result_dict = json.loads(response.choices[0].message.content)
