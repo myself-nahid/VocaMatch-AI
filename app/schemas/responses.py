@@ -13,6 +13,7 @@ class MatchResult(BaseModel):
     match_color: str        # e.g., "#4CAF50" (Green), "#FF9800" (Orange), "#9E9E9E" (Grey)
     is_special_match: bool  # True if the score is very high (e.g., > 85)
     # ------------------------------------
+    image_url: Optional[str] = None
     matching_reason: str
     # error: Optional[str] = None
 

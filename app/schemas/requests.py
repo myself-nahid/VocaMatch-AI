@@ -8,6 +8,7 @@ class UserProfile(BaseModel):
     location: str
     interests: List[str]
     voice_intro_text: str
+    image_url: Optional[str] = None
     answers: Optional[List[Dict[str, str]]] =[]
 
 class BulkMatchRequest(BaseModel):

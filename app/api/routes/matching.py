@@ -47,6 +47,7 @@ async def bulk_score_users(payload: BulkMatchRequest):
                 match_level=level,
                 match_color=color,
                 is_special_match=is_special,
+                image_url=candidate.image_url,
                 matching_reason=response.matching_reason
             ))
             
