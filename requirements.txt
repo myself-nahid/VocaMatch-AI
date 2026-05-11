@@ -1,7 +1,6 @@
 fastapi
 uvicorn
 openai
-pydantic
 pydantic-settings
+httpx
 python-multipart
-tenacity

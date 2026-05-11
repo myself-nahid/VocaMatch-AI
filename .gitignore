@@ -54,3 +54,12 @@ Thumbs.db
 .env
 __pycache__/
 *.pyc
+
+# ignore files that i test voice to voice
+test_client.py
+tmp_ws_test.py
+app/services/realtime_agent.py
+app/services/onboarding_service.py
+app/api/websockets
+app/api/routes/onboarding.py
+app/api/routes/transcription.py

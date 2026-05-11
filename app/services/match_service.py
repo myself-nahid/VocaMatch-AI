@@ -1,65 +1,61 @@
 import json
-from openai import RateLimitError
-from tenacity import retry, wait_random_exponential, stop_after_attempt
-from app.services.openai_client import client
+from openai import AsyncOpenAI
+from app.core.config import settings
 from app.schemas.requests import UserProfile
-# Import the correct, single MatchResponse schema
-from app.schemas.responses import MatchResponse 
-from fastapi import HTTPException
+from app.schemas.responses import MatchResult
 
-# Add a retry decorator to handle OpenAI rate limits gracefully during bulk requests
-@retry(
-    wait=wait_random_exponential(min=1, max=10),
-    stop=stop_after_attempt(5),
-    retry_error_callback=lambda retry_state: retry_state.outcome.result()
-)
-async def calculate_compatibility(user_a: UserProfile, user_b: UserProfile) -> MatchResponse:
-    """
-    Calculates the compatibility between two users and returns a single match response.
-    This function is designed to be called concurrently.
-    """
-    # CORRECTED PROMPT: Uses the new fields from the UserProfile model
+client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+async def calculate_compatibility(user_a: UserProfile, user_b: UserProfile) -> MatchResult:
+    # Build a summary of their answers for the AI
+    answers_a = "\n".join([f"Q: {a.question} A: {a.answer}" for a in user_a.answers])
+    answers_b = "\n".join([f"Q: {b.question} A: {b.answer}" for b in user_b.answers])
+
     prompt = f"""
-    You are an expert AI matchmaker for the VocaMatch app. 
-    Analyze the following two user profiles and determine their compatibility based on personality, interests, and stated answers.
-    
-    User A (ID: {user_a.user_id}, Name: {user_a.name}, Age: {user_a.age}, Location: "{user_a.location}")
-    - Interests: {', '.join(user_a.interests)}
-    - Voice Intro says: "{user_a.voice_intro_text}"
-    - Answers to Questions: {user_a.answers}
-    
-    User B (ID: {user_b.user_id}, Name: {user_b.name}, Age: {user_b.age}, Location: "{user_b.location}")
-    - Interests: {', '.join(user_b.interests)}
-    - Voice Intro says: "{user_b.voice_intro_text}"
-    - Answers to Questions: {user_b.answers}
-    
-    Return a JSON object strictly following this format:
+    You are a relationship psychologist. Analyze these two profiles:
+
+    --- USER A ---
+    Name: {user_a.name}
+    Interests: {', '.join(user_a.interests)}
+    Interview Transcript: {user_a.conversation}
+    Survey Answers:
+    {answers_a}
+
+    --- USER B ---
+    Name: {user_b.name}
+    Interests: {', '.join(user_b.interests)}
+    Interview Transcript: {user_b.conversation}
+    Survey Answers:
+    {answers_b}
+
+    Return JSON:
     {{
-        "compatibility_score": <integer from 1 to 100>,
-        "matching_reason": "<A compelling 2-sentence explanation of why they are or aren't a good match, focusing on shared interests and personality alignment.>"
+        "compatibility_score": <int 1-100>,
+        "matching_reason": "<3 sentence expert analysis>"
     }}
     """
     
-    try:
-        response = await client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a matchmaking AI that only outputs valid JSON."},
-                {"role": "user", "content": prompt}
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.0,
-            top_p=1.0
-        )
-        
-        result_dict = json.loads(response.choices[0].message.content)
-        # CORRECTED RETURN: Returns the correct Pydantic model instance
-        return MatchResponse(**result_dict)
+    response = await client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"}
+    )
     
-    except RateLimitError as e:
-        # Re-raise the rate limit error so Tenacity can catch it and retry
-        raise e
-        
-    except Exception as e:
-        # For all other errors, raise an HTTPException
-        raise HTTPException(status_code=500, detail=f"AI Matching failed for user {user_b.user_id}: {str(e)}")
+    data = json.loads(response.choices[0].message.content)
+    score = data["compatibility_score"]
+    
+    # Determine UI Indicators
+    level, color, special = ("Low", "#9E9E9E", False)
+    if score >= 85: level, color, special = ("Excellent", "#4CAF50", True)
+    elif score >= 60: level, color, special = ("Good", "#8BC34A", False)
+    elif score >= 40: level, color, special = ("Fair", "#FF9800", False)
+
+    return MatchResult(
+        candidate_id=user_b.user_id,
+        image_url=user_b.image_url, # Now matches perfectly
+        compatibility_score=score,
+        match_level=level,
+        match_color=color,
+        is_special_match=special,
+        matching_reason=data["matching_reason"]
+    )
